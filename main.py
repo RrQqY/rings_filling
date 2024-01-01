@@ -58,6 +58,11 @@ class fillRing(object):
     Ring = namedtuple('Ring', ['ring', 'dilation_direction'])
 
     def fillMultipleRing(self, file_path):
+        """
+        有内部空腔的多层环情况
+        :param file_path: csv文件路径
+        :return: 一组内环的点序列
+        """
         # 读入多个环的采样点
         rings = readMultiLayerCSV(file_path)
         base_ring_names = list(rings.keys())
@@ -165,8 +170,10 @@ if __name__ == '__main__':
     processor = ImageProcessor()
     processor.process_image('test1.png', 'test1.csv')
 
+    # 没有内部空腔的单层环情况
     # s = fillRing(dilation_radius=8)
     # s.fillSingleRing(file_path="test.csv")
 
+    # 有内部空腔的多层环情况
     s = fillRing(dilation_radius=8)
     s.fillMultipleRing(file_path="test1.csv")
