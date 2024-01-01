@@ -86,8 +86,8 @@ def judgeDilationDirection(buffers):
 
 class ImageProcessor:
     def __init__(self):
-        self.image_path = "test.png"
-        self.output_path = "test.csv"
+        self.image_path = "test1.png"
+        self.output_path = "test1.csv"
 
     @staticmethod
     def contour_similarity(c1, c2):
