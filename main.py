@@ -7,7 +7,7 @@ from shapely.geometry import *
 from shapely.ops import unary_union
 from queue import Queue
 from collections import namedtuple
-from utils import ImageProcessor, readMultiLayerCSV, UnionFind, judgeDilationDirection
+from utils import *
 
 
 class fillRing(object):
@@ -161,7 +161,7 @@ class fillRing(object):
             plt.plot(points[:, 0], points[:, 1], "black")
 
         # plt.subplot(121), plt.title("Before Filling", **self.title_style), plt.axis("off")
-        plt.title("After Filling", **self.title_style), plt.axis("off")
+        plt.title("After Filling"), plt.axis("off")
         plt.show()
         return result
 
@@ -171,9 +171,16 @@ if __name__ == '__main__':
     processor.process_image('test1.png', 'test1.csv')
 
     # 没有内部空腔的单层环情况
-    # s = fillRing(dilation_radius=8)
-    # s.fillSingleRing(file_path="test.csv")
+    # fill = fillRing(dilation_radius=8)
+    # fill.fillSingleRing(file_path="test.csv")
 
     # 有内部空腔的多层环情况
-    s = fillRing(dilation_radius=8)
-    s.fillMultipleRing(file_path="test1.csv")
+    fill = fillRing(dilation_radius=8)
+    result = fill.fillMultipleRing(file_path="test1.csv")
+
+    # 点采样
+    result = pointSample(gap=10, result=result)
+    # 显示result
+    pointPlot(result=result, title="After Sampling")
+
+    # result = pointProject(target_size=[1, 1], current_size=[600, 800], result=result)

@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+import math
 import csv
 from matplotlib import pyplot as plt
 from collections import defaultdict
@@ -91,14 +92,14 @@ class ImageProcessor:
 
     @staticmethod
     def contour_similarity(c1, c2):
-        return cv2.matchShapes(c1, c2, cv2.CONTOURS_MATCH_I2, 0)
+        return cv2.matchShapes(c1, c2, cv2.CONTOURS_MATCH_I3, 0)
 
     def process_image(self, image_path, output_path):
         self.image_path = image_path
         self.output_path = output_path
 
         image = cv2.imread(self.image_path, cv2.IMREAD_GRAYSCALE)
-        plt.subplot(131), plt.imshow(image, cmap='gray')
+        plt.subplot(131), plt.imshow(image, cmap='gray'), plt.axis("off"), plt.title("Original Image")
 
         _, binary = cv2.threshold(image, 127, 255, cv2.THRESH_BINARY_INV)
 
@@ -112,7 +113,7 @@ class ImageProcessor:
             # 计算当前轮廓与已选轮廓的相似性
             similarity_scores = [self.contour_similarity(contour, selected) for selected in selected_contours]
             # 如果相似性较低，说明是一个新的轮廓，将其加入已选轮廓列表
-            if min(similarity_scores) > 0.5:
+            if min(similarity_scores) > 0.2:
                 selected_contours.append(contour)
 
         with open(self.output_path, 'w', newline='') as file:
@@ -123,16 +124,82 @@ class ImageProcessor:
                 writer.writerow([contour_name])
                 for point in contour:
                     x, y = point[0]
-                    writer.writerow([x, y])
+                    # y轴取图像高度减去y轴坐标，使得坐标原点在左上角
+                    writer.writerow([x, image.shape[1] - y])
 
         # 创建和原始图像一样大小的空图像
-        white = np.ones_like(image)
-        cv2.drawContours(white, selected_contours, -1, (0, 0, 255), 2)
+        contours = np.ones_like(image)
+        cv2.drawContours(contours, selected_contours, -1, (0, 0, 255), 2)
 
         # Show the image with all contours
-        plt.subplot(132), plt.imshow(edges, cmap='gray')
-        plt.subplot(133), plt.imshow(white, cmap='gray')
+        plt.subplot(132), plt.imshow(edges, cmap='gray'), plt.axis("off"), plt.title("Canny Edge Detection")
+        plt.subplot(133), plt.imshow(contours, cmap='gray'), plt.axis("off"), plt.title("Contours")
         plt.show()
+        # print(image.shape)
+
+
+def pointPlot(result, title):
+    for points in result:
+        # 显示散点
+        plt.scatter(points[:, 0], points[:, 1], s=1, color="black")
+    plt.axis("off"), plt.title(title)
+    plt.show()
+
+
+def pointProject(target_size, current_size, result):
+    """
+    将点的坐标映射到新的坐标系中
+    :param target_size: 目标坐标系的大小
+    :param current_size: 当前坐标系的大小
+    :param result: 需要映射的点的坐标
+    :return: 映射后的点的坐标
+    """
+    # 计算x和y轴的缩放比率
+    x_ratio = target_size[0] / current_size[0]
+    y_ratio = target_size[1] / current_size[1]
+
+    mapped_result = []
+    mapped_ring = []
+
+    # 遍历result中的所有点，进行映射，并将映射后的结果添加到新的结果列表中
+    for ring in result:
+        for point in ring:
+            mapped_ring.append([point[0] * x_ratio, point[1] * y_ratio])
+            mapped_result.append(mapped_ring)
+            # print(mapped_ring)
+
+    print("Projection finished")
+    return mapped_result
+
+
+def pointSample(gap, result):
+    """
+    对点进行等间距采样
+    :param result: 需要采样的点
+    :return: 采样后的点
+    """
+    sampled_result = []
+
+    for ring in result:
+        ring_len = 0
+        # 计算ring的总长度
+        for i in range(1, len(ring)):
+            point1, point2 = ring[i-1], ring[i]
+            ring_len += math.sqrt((point2[0]-point1[0])**2 + (point2[1]-point1[1])**2)
+
+        # 计算保留点的数量，留意可能的除以0错误
+        num_points = int(ring_len // gap) if ring_len != 0 else len(ring)
+
+        # 求得每隔interval个点取一个点，可能的除以0错误也需要注意
+        interval = len(ring) // num_points if num_points != 0 else len(ring)
+        # print(len(ring), num_points, interval)
+        # 对ring进行采样
+        if len(ring) > interval and interval > 0:
+            sampled_ring = ring[::interval]
+            sampled_result.append(sampled_ring)
+
+    print("Sampling finished")
+    return sampled_result
 
 
 if __name__ == '__main__':
