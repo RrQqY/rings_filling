@@ -167,20 +167,26 @@ class fillRing(object):
 
 
 if __name__ == '__main__':
+    img_path = 'test1.png'
+    csv_path = 'test1.csv'
     processor = ImageProcessor()
-    processor.process_image('test1.png', 'test1.csv')
+    processor.process_image(img_path, csv_path)
 
     # 没有内部空腔的单层环情况
     # fill = fillRing(dilation_radius=8)
     # fill.fillSingleRing(file_path="test.csv")
 
     # 有内部空腔的多层环情况
-    fill = fillRing(dilation_radius=8)
-    result = fill.fillMultipleRing(file_path="test1.csv")
+    fill = fillRing(dilation_radius=16)
+    result = fill.fillMultipleRing(file_path=csv_path)
 
     # 点采样
-    result = pointSample(gap=10, result=result)
-    # 显示result
+    result = pointSample(gap=16, result=result)
     pointPlot(result=result, title="After Sampling")
+    # 显示result中y轴坐标最大值
+    max_y = max(max(points[:, 1]) for points in result)
+    print(max_y)
 
-    # result = pointProject(target_size=[1, 1], current_size=[600, 800], result=result)
+    # 点映射
+    result = pointProject(center_new=(500, 400), r=0.4, k=-1.2, result=result)
+    pointPlot(result=result, title="After Projection")

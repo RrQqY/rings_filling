@@ -25,7 +25,7 @@ def readMultiLayerCSV(file_name):
         # 采样点
         else:
             point = line.split(",")
-            layers[layer].append([float(point[0]), float(point[1])])
+            layers[layer].append([float(point[0]), float(point[1])-200])
     return layers
 
 
@@ -34,6 +34,7 @@ class UnionFind(object):
     构造函数。初始化一个并查集，其中的元素为0到n-1。
     father列表储存每个元素的父节点；初始化时，每个元素父节点都是其自身。
     """
+
     def __init__(self, n):
         self.father = [i for i in range(n)]
 
@@ -138,43 +139,116 @@ class ImageProcessor:
         # print(image.shape)
 
 
+# def pointPlot(result, title):
+#     for points in result:
+#         # 在800×600的空图像上显示散点
+#         plt.scatter(points[:, 0], points[:, 1], s=1, color="black")
+#     plt.axis("off"), plt.title(title)
+#     plt.show()
+
+
 def pointPlot(result, title):
+    fig = plt.figure(figsize=(8, 6))
+    ax = fig.add_subplot(111)
+
     for points in result:
-        # 显示散点
-        plt.scatter(points[:, 0], points[:, 1], s=1, color="black")
-    plt.axis("off"), plt.title(title)
+        x = points[:, 0]
+        y = points[:, 1]
+        ax.scatter(x, y, s=1, color='black')  # Scatter plot
+
+    plt.xlim(0, 800)  # x-axis limits
+    plt.ylim(0, 600)  # y-axis limits
+    plt.axis('off'), plt.title(title)
     plt.show()
 
 
-def pointProject(target_size, current_size, result):
-    """
-    将点的坐标映射到新的坐标系中
-    :param target_size: 目标坐标系的大小
-    :param current_size: 当前坐标系的大小
-    :param result: 需要映射的点的坐标
-    :return: 映射后的点的坐标
-    """
-    # 计算x和y轴的缩放比率
-    x_ratio = target_size[0] / current_size[0]
-    y_ratio = target_size[1] / current_size[1]
+# def pointProject(target_size, current_size, result):
+#     """
+#     将点的坐标映射到新的坐标系中
+#     :param target_size: 目标坐标系的大小
+#     :param current_size: 当前坐标系的大小
+#     :param result: 需要映射的点的坐标
+#     :return: 映射后的点的坐标
+#     """
+#     # 计算x和y轴的缩放比率
+#     x_ratio = target_size[0] / current_size[0]
+#     y_ratio = target_size[1] / current_size[1]
+#
+#     mapped_result = []
+#     mapped_ring = []
+#
+#     # 遍历result中的所有点，进行映射，并将映射后的结果添加到新的结果列表中
+#     for ring in result:
+#         for point in ring:
+#             mapped_ring.append([point[0] * x_ratio, point[1] * y_ratio])
+#             mapped_result.append(mapped_ring)
+#             # print(mapped_ring)
+#
+#     print("Projection finished")
+#     return mapped_result
 
+
+def pointProject(center_new, r, k, result):
     mapped_result = []
-    mapped_ring = []
 
     # 遍历result中的所有点，进行映射，并将映射后的结果添加到新的结果列表中
     for ring in result:
+        points = []
+
         for point in ring:
-            mapped_ring.append([point[0] * x_ratio, point[1] * y_ratio])
-            mapped_result.append(mapped_ring)
-            # print(mapped_ring)
+            point_old = point - [400, 300]
+            x_new, y_new = center_new
+
+            # 使用给定的新中心、缩小比例和斜率创建一个新的基于旋转的仿射矩阵
+            theta = np.arctan(k)  # 从斜率计算角度
+            scale = np.array([[r, 0],
+                              [0, r]])  # 缩放矩阵
+            rotation = np.array([[np.cos(theta), -np.sin(theta)],
+                                 [np.sin(theta), np.cos(theta)]])  # 旋转矩阵
+            translation = np.array([x_new, y_new])  # 平移矩阵
+
+            # 在旧点上应用缩放、旋转和平移变换
+            point_new = scale @ np.array(point_old)  # 应用缩放
+            point_new = rotation @ point_new  # 应用旋转
+            point_new += translation  # 应用平移
+            points.append(tuple(point_new))
+
+        mapped_ring = np.array(list(points), dtype="float32")
+        mapped_result.append(mapped_ring)
 
     print("Projection finished")
     return mapped_result
 
 
+def getRectangle(contour):
+    # 使用minAreaRect获取最小面积的矩形(该矩形可能会旋转)
+    rect = cv2.minAreaRect(contour)
+
+    # 获取矩形的中心点坐标、宽度、高度和旋转角度
+    center, (width, height), angle = rect
+
+    # 根据最小矩形的宽度和高度确定长轴和斜率
+    if width < height:
+        long_axis_slope = np.tan(np.deg2rad(90 + angle))
+    else:
+        long_axis_slope = np.tan(np.deg2rad(angle))
+
+    # 计算高度与宽度之比，并依据比例判断返回值
+    ratio = height / width
+    if ratio > 3 / 4:
+        is_width = True
+        dimension = width
+    else:
+        is_width = False
+        dimension = height
+
+    return center, long_axis_slope, is_width, dimension
+
+
 def pointSample(gap, result):
     """
     对点进行等间距采样
+    :param gap: 采样间隔
     :param result: 需要采样的点
     :return: 采样后的点
     """
@@ -184,10 +258,10 @@ def pointSample(gap, result):
         ring_len = 0
         # 计算ring的总长度
         for i in range(1, len(ring)):
-            point1, point2 = ring[i-1], ring[i]
-            ring_len += math.sqrt((point2[0]-point1[0])**2 + (point2[1]-point1[1])**2)
+            point1, point2 = ring[i - 1], ring[i]
+            ring_len += math.sqrt((point2[0] - point1[0]) ** 2 + (point2[1] - point1[1]) ** 2)
 
-        # 计算保留点的数量，留意可能的除以0错误
+        # 计算保留点的数量，留意可能的除0错误
         num_points = int(ring_len // gap) if ring_len != 0 else len(ring)
 
         # 求得每隔interval个点取一个点，可能的除以0错误也需要注意
